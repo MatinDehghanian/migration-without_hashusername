@@ -20,7 +20,23 @@ SQLITE_PATH = "/var/lib/marzban/db.sqlite3"
 TABLES = ["users", "jwt", "admins"]
 OUTPUT_FILE = "marzban.json"
 MAX_ATTEMPTS = 3
+PROTOCOL = "VLESS"
+PROTOCOL2 = "VMess"
 
+
+def get_protocol_type() -> None:
+    while True:
+        print("select which protocol uuid you want to transfer!\n if the user doesn't have uuid for vless then vmess uuid will be used or if there is nothing at all then the uuid will be null")
+        type = int(input("\n1) VLESS\n2) VMess \n\nEnter protocol type number: "))
+        match type:
+            case 1:
+                print(f"Selected protocol: VLESS")
+                return "VLESS"
+            case 2:
+                print(f"Selected protocol: VMess")
+                return "VMess"
+            case _:
+                logging.error("Invalid input. Please enter 1 or 2.")
 
 def get_database_type() -> str:
     """Prompt the user to select the database type."""
@@ -36,7 +52,7 @@ def get_and_verify_mysql_password() -> str:
     for attempt in range(MAX_ATTEMPTS):
         password = getpass.getpass("Enter MySQL database password: ")
         try:
-            with closing(pymysql.connect(**MYSQL_CONFIG, password=password)):
+            with closing(pymysql.connect(**MYSQL_CONFIG, password=password, port=33063)):
                 logging.info("MySQL password verified successfully.")
                 return password
         except pymysql.Error:
@@ -54,7 +70,7 @@ def get_database_connection(
     """Create and return a database connection."""
     try:
         if db_type == "mysql":
-            return pymysql.connect(**MYSQL_CONFIG, password=password)
+            return pymysql.connect(**MYSQL_CONFIG, password=password, port=33063)
         else:  # sqlite
             if not os.path.exists(SQLITE_PATH):
                 logging.error(f"SQLite database file not found at {SQLITE_PATH}")
@@ -70,7 +86,12 @@ def fetch_table_data(
 ) -> List[Dict[str, Any]]:
     """Fetch data from a specific table."""
     try:
-        cursor.execute(f"SELECT * FROM {table_name}")
+        if table_name == "users":
+            cursor.execute(
+                f"SELECT users.*, COALESCE( JSON_EXTRACT(T1.settings, '$.id'), JSON_EXTRACT(T2.settings, '$.id') ) AS uuid, CASE WHEN JSON_EXTRACT(T1.settings, '$.id') IS NOT NULL THEN '{PROTOCOL}' WHEN JSON_EXTRACT(T2.settings, '$.id') IS NOT NULL THEN '{PROTOCOL2}' ELSE NULL END AS proxy_type FROM users LEFT JOIN proxies AS T1 ON users.id = T1.user_id AND T1.type = '{PROTOCOL}' LEFT JOIN proxies AS T2 ON users.id = T2.user_id AND T2.type = '{PROTOCOL2}';"
+            )
+        else:
+            cursor.execute(f"SELECT * FROM {table_name}")
         columns = [desc[0] for desc in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
     except (pymysql.Error, sqlite3.Error) as e:
@@ -111,7 +132,10 @@ def main():
     db_type = get_database_type()
     password = get_and_verify_mysql_password() if db_type == "mysql" else None
     database_data = {}
-
+    global PROTOCOL
+    PROTOCOL = get_protocol_type()
+    global PROTOCOL2
+    PROTOCOL2 = "VMess" if PROTOCOL == "VLESS" else "VLESS"
     with closing(get_database_connection(db_type, password)) as connection:
         cursor = connection.cursor()
         for table in TABLES:
