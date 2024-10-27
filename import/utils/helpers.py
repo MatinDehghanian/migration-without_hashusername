@@ -130,7 +130,7 @@ def parse_marz_user(old: MarzUserData, service: int) -> UserCreate:
     )
 
     username = (old.username).lower()
-    if username in get_exceptions_list:
+    if username in get_exceptions_list():
         clean = re.sub(r"[^\w]", "", username.lower())
         hash_str = str(int(hashlib.md5(username.encode()).hexdigest(), 16) % 10000).zfill(4)
         username = f"{clean}_{hash_str}"[:32]
