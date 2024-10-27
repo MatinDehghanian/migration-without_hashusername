@@ -23,8 +23,9 @@ async def upsert_user(request: Request, token: str):
         clean = re.sub(r"[^\w]", "", username.lower())
         hash_str = str(int(hashlib.md5(username.encode()).hexdigest(), 16) % 10000).zfill(4)
         username = f"{clean}_{hash_str}"[:32]
-
-    dbuser = await panel.get_user(username.replace('-', '_'))
+    else:
+        username = (username.lower()).replace('-', '_')
+    dbuser = await panel.get_user(username)
     if not dbuser or dbuser.created_at > sub.created_at:
         raise HTTPException(
             status_code=404, detail="User not found or invalid creation date"

@@ -129,15 +129,18 @@ def parse_marz_user(old: MarzUserData, service: int) -> UserCreate:
         else None
     )
 
-    username = old.username
+    username = (old.username).lower()
     if username in get_exceptions_list:
         clean = re.sub(r"[^\w]", "", username.lower())
         hash_str = str(int(hashlib.md5(username.encode()).hexdigest(), 16) % 10000).zfill(4)
         username = f"{clean}_{hash_str}"[:32]
+    else:
+        username = (username.lower()).replace('-', '_')
+
     key = gen_key(old.uuid) if old.uuid is not None else None
 
     return UserCreate(
-        username=username.replace('-', '_'),
+        username=username,
         data_limit=data_limit,
         data_limit_reset_strategy=old.data_limit_reset_strategy,
         expire_strategy=(
