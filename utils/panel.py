@@ -43,6 +43,6 @@ async def get_user(username: str) -> UserResponse:
 
 @lru_cache(maxsize=1)
 def get_exceptions_list():
-    with open("usernames.json", "r") as file:
+    with open("exceptions.json", "r") as file:
         usernames = json.load(file)
     return usernames
